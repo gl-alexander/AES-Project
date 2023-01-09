@@ -10,6 +10,7 @@ const char encryptedMessagePath[] = "encrypted_message.txt";
 const int KEY_LEN = 16;
 const int NUMBER_OF_ROUNDS = 10;
 const int EXPANDED_KEY_LEN = (NUMBER_OF_ROUNDS + 1) * KEY_LEN; // the +1 is because we need to save the original key as well
+const int MAX_MESSAGE_LENGHT = 1024;
 
 //Rijndael S-Box for AES Encryption
 unsigned char s_box[256] =
@@ -112,15 +113,25 @@ int strLen(const unsigned char* str) {
     return len;
 }
 
-unsigned char* extendMessage(const char* message) {
-    int msgLen = strLen(message);
-    int paddedLen = msgLen;
-    paddedLen = msgLen + (msgLen % 16); // we artificially complete the remaining msgLen % 16 bytes and set them to 0's
+int paddedMessageLenght(int originalLen) {
+    int res = originalLen;
+
+    if ((originalLen % KEY_LEN) != 0) { // we only need to add to the message if it's not divisible into 16 byte chunks
+        res = ((originalLen / KEY_LEN) + 1) * KEY_LEN; // we artificially "complete" the message to fill out the last 16 byte chunk
+    }
+
+    return res;
+}
+
+unsigned char* padMessage(const char* message) {
+    int originalLenght = strLen(message);
+    int finalMessageLength = paddedMessageLenght(originalLenght); 
     
-    unsigned char* paddedMsg = new unsigned char[paddedLen];
-    for (int i = 0; i < paddedLen; i++) {
-        if (i < msgLen) paddedMsg[i] = message[i];
-        else paddedMsg[i] = 0;
+    unsigned char* paddedMsg = new unsigned char[finalMessageLength];
+
+    for (int i = 0; i < finalMessageLength; i++) {
+        if (i < originalLenght) paddedMsg[i] = message[i];
+        else paddedMsg[i] = 0; // if we've gone over the original message, we artificially complete it with zeroes
     }
     return paddedMsg;
 }
@@ -132,11 +143,11 @@ unsigned char* getPaddedMessage(const char path[]) {
         cout << "Error while opening " << keyPath;
         return new unsigned char[0];
     }
-    char messageString[1024];
-    msgFile.getline(messageString, 1024);
+    char messageString[MAX_MESSAGE_LENGHT];
+    msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
     msgFile.close();
 
-    unsigned char* paddedMessage = extendMessage(messageString);//rounds the message to 16 bytes if needed
+    unsigned char* paddedMessage = padMessage(messageString);//rounds the message to 16 bytes if needed
     return paddedMessage;
 }
 
@@ -271,7 +282,6 @@ void round(unsigned char* state, const unsigned char* key) {
     addRoundKey(state, key);
 }
 
-
 void finalRound(unsigned char* state, const unsigned char* key) {
     // similar to a normal round() except it doesn't mix columns
     substituteBytes(state);
@@ -301,7 +311,7 @@ void encrypt(const unsigned char* message, const unsigned char* expandedKey, uns
 
 }
 
-void saveEncryptedMessageToFile(const char* path, unsigned char* encryptedMessage) {
+void saveEncryptedMessageToFile(const char* path, const unsigned char* encryptedMessage) {
     ofstream writeFile;
     writeFile.open(path, ios::trunc);
     if (writeFile.is_open()) {
@@ -317,32 +327,35 @@ void saveEncryptedMessageToFile(const char* path, unsigned char* encryptedMessag
 
 int main()
 {
-    unsigned char* message = getPaddedMessage(messagePath); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
-    int messageLenght = strLen(message);
-
     unsigned char key[KEY_LEN];
     getKey(key, keyPath); //reads the file containing the key, it must have at least 16 bytes / chars
-
     unsigned char expandedKeys[EXPANDED_KEY_LEN];
     keyExpansion(key, expandedKeys);
-    //we now have the expanded keys for each round
 
-    unsigned char* encryptedMessage = new unsigned char[messageLenght];
+    /* we now have the expanded keys for each round */
 
-    for (int i = 0; i < messageLenght; i += 16) { //we're working in chunks of 16 bytes
+    unsigned char* message = getPaddedMessage(messagePath); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
+    int originalLen = strLen(message);
+    int finalMessageLength = paddedMessageLenght(originalLen); // we need the message length to be divisible by 16;
+    
+    unsigned char* encryptedMessage = new unsigned char[finalMessageLength];
+    for (int i = 0; i < finalMessageLength; i += 16) { //we're working in chunks of 16 bytes
         encrypt(message + i, expandedKeys, encryptedMessage + i);
     }
 
-    //we now have the encrypted message
+    /* we now have the encrypted message */
     saveEncryptedMessageToFile(encryptedMessagePath, encryptedMessage);
 
     //testing if the output is correct
-    cout << endl;
+    /*
+        cout << endl;
     unsigned char* encr =  getPaddedMessage(encryptedMessagePath);
-    for (int i = 0; i < messageLenght; i++) {
+    for (int i = 0; i < finalMessageLength; i++) {
         cout << hex << (int)encr[i] << " ";
     }
+    */
+    
 
     delete[] message;
-    //delete[] encryptedMessage;
+    delete[] encryptedMessage;
 }
