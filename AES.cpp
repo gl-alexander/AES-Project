@@ -98,7 +98,7 @@ unsigned char mul3[] =
 
 int strLen(const char* str) {
     int len = 0;
-    while (*str) {
+    while (*str && *str != EOF) {
         len++;
         str++;
     }
@@ -106,13 +106,14 @@ int strLen(const char* str) {
 }
 int strLen(const unsigned char* str) {
     int len = 0;
-    while (*str) {
+    while (*str && *str != EOF) {
         len++;
         str++;
     }
     return len;
 }
 
+//simple function for rounding the message length to be divisible by 16
 int paddedMessageLenght(int originalLen) {
     int res = originalLen;
 
@@ -123,8 +124,7 @@ int paddedMessageLenght(int originalLen) {
     return res;
 }
 
-unsigned char* padMessage(const char* message) {
-    int originalLenght = strLen(message);
+unsigned char* padMessage(const char* message, int originalLenght) {
     int finalMessageLength = paddedMessageLenght(originalLenght); 
     
     unsigned char* paddedMsg = new unsigned char[finalMessageLength];
@@ -136,18 +136,27 @@ unsigned char* padMessage(const char* message) {
     return paddedMsg;
 }
 
-unsigned char* getPaddedMessage(const char path[]) {
-    ifstream msgFile;
+unsigned char* getMessage(const char path[]) {
+    fstream msgFile;
     msgFile.open(path);
+
     if (!msgFile.is_open()) {
         cout << "Error while opening " << keyPath;
         return new unsigned char[0];
     }
     char messageString[MAX_MESSAGE_LENGHT];
-    msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
+    int i = 0;
+    while (( messageString[i] = msgFile.get()) != EOF) {
+        //cout << messageString[i];
+        i++;
+    }
+    int messageLenght = i;
+    cout << endl << messageLenght << endl;
+    //msgFile.read(messageString, MAX_MESSAGE_LENGHT);
+    //msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
     msgFile.close();
 
-    unsigned char* paddedMessage = padMessage(messageString);//rounds the message to 16 bytes if needed
+    unsigned char* paddedMessage = padMessage(messageString, messageLenght);//rounds the message to 16 bytes if needed
     return paddedMessage;
 }
 
@@ -334,10 +343,11 @@ int main()
 
     /* we now have the expanded keys for each round */
 
-    unsigned char* message = getPaddedMessage(messagePath); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
+    unsigned char* message = getMessage(messagePath); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
     int originalLen = strLen(message);
     int finalMessageLength = paddedMessageLenght(originalLen); // we need the message length to be divisible by 16;
     
+    cout << originalLen << "    " << finalMessageLength << endl;
     unsigned char* encryptedMessage = new unsigned char[finalMessageLength];
     for (int i = 0; i < finalMessageLength; i += 16) { //we're working in chunks of 16 bytes
         encrypt(message + i, expandedKeys, encryptedMessage + i);
@@ -347,13 +357,13 @@ int main()
     saveEncryptedMessageToFile(encryptedMessagePath, encryptedMessage);
 
     //testing if the output is correct
-    /*
+    
         cout << endl;
-    unsigned char* encr =  getPaddedMessage(encryptedMessagePath);
+    unsigned char* encr =  getMessage(encryptedMessagePath);
     for (int i = 0; i < finalMessageLength; i++) {
         cout << hex << (int)encr[i] << " ";
     }
-    */
+    
     
 
     delete[] message;
