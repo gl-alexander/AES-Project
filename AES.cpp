@@ -412,7 +412,8 @@ void encrypt(const unsigned char* message, const unsigned char* expandedKey, uns
     addRoundKey(state, expandedKey); // initially, we need to add the round key before the first official round
 
     for (int i = 0; i < NUMBER_OF_ROUNDS - 1; i++) { // we only need to perform the usual round method 9 times, the last round is specific
-        round(state, expandedKey);
+        int keyBegin = KEY_LEN * (i + 1);
+        round(state, expandedKey + keyBegin);
     }
 
     finalRound(state, expandedKey + EXPANDED_KEY_LEN - KEY_LEN);
