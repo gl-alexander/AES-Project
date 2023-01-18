@@ -226,19 +226,17 @@ int paddedMessageLenght(int originalLen) {
     return res;
 }
 
-unsigned char* padMessage(const char* message, int originalLenght) {
-    int finalMessageLength = paddedMessageLenght(originalLenght); 
-    cout << "in padMessage, the length is: " << finalMessageLength << endl;
-    unsigned char* paddedMsg = new unsigned char[finalMessageLength];
+unsigned char* padMessage(const char* message, int paddedLength, int originalLen) {
+    unsigned char* paddedMsg = new unsigned char[paddedLength];
 
-    for (int i = 0; i < finalMessageLength; i++) {
-        if (i < originalLenght) paddedMsg[i] = message[i];
+    for (int i = 0; i < paddedLength; i++) {
+        if (i < originalLen) paddedMsg[i] = message[i];
         else paddedMsg[i] = 0; // if we've gone over the original message, we artificially complete it with zeroes
     }
     return paddedMsg;
 }
 
-unsigned char* getMessage(const char path[]) {
+unsigned char* getMessageAndLength(const char path[], int& paddedLen) {
     fstream msgFile;
     msgFile.open(path);
 
@@ -247,18 +245,18 @@ unsigned char* getMessage(const char path[]) {
         return new unsigned char[0];
     }
     char messageString[MAX_MESSAGE_LENGHT];
-    int i = 0;
-    while (( messageString[i] = msgFile.get()) != EOF) {
-        //cout << messageString[i];
-        i++;
-    }
-    int messageLenght = i;
-    cout << endl << messageLenght << endl;
-    //msgFile.read(messageString, MAX_MESSAGE_LENGHT);
     //msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
-    msgFile.close();
 
-    unsigned char* paddedMessage = padMessage(messageString, messageLenght);//rounds the message to 16 bytes if needed
+    int i = 0;
+    while (!msgFile.eof()) {
+        messageString[i++] = msgFile.get();
+    }
+    int originalLen = i - 1; //we subtract one since we've incremented it on the EOF character in the while loop
+    messageString[originalLen] = 0;
+    cout << endl << originalLen << endl;
+    msgFile.close();
+    paddedLen = paddedMessageLenght(originalLen);
+    unsigned char* paddedMessage = padMessage(messageString, originalLen, paddedLen);//rounds the message to 16 bytes if needed
     return paddedMessage;
 }
 
@@ -425,11 +423,13 @@ void encrypt(const unsigned char* message, const unsigned char* expandedKey, uns
 
 }
 
-void saveEncryptedMessageToFile(const char* path, const unsigned char* encryptedMessage) {
+void saveEncryptedMessageToFile(const char* path, const unsigned char* encryptedMessage, const int msglen) {
     ofstream writeFile;
     writeFile.open(path, ios::out | ios::binary | ios::trunc);
     if (writeFile.is_open()) {
-        writeFile << encryptedMessage;
+        for (int i = 0; i < msglen; i++) {
+            writeFile << (char)encryptedMessage[i];
+        }
         writeFile.close();
         cout << "Successfully saved encrypted message to file " << path;
     }
@@ -438,32 +438,15 @@ void saveEncryptedMessageToFile(const char* path, const unsigned char* encrypted
     }
     
 }
-
-unsigned char* getEncryptedMessage(const char path[]) {
-    fstream msgFile;
-    msgFile.open(path, ios::in | ios::binary);
-
-    if (!msgFile.is_open()) {
-        cout << "Error while opening " << keyPath;
-        return new unsigned char[0];
+int encryptedFileLen(char* encrypted) {
+    int len = 0;
+    while (*encrypted != EOF) {
+        len++;
+        encrypted++;
     }
-    unsigned char* messageString = new unsigned char[MAX_MESSAGE_LENGHT];
-    int i = 0;
-    char ch = msgFile.get();
-    while (ch != EOF) {
-        messageString[i++] = (unsigned char)ch;
-        ch = msgFile.get();
-        //cout << ch << endl;
-    }
-    messageString[i] = '\0';
-    int messageLenght = i;
-    cout << endl << messageLenght << endl;
-    //msgFile.read(messageString, MAX_MESSAGE_LENGHT);
-    //msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
-    msgFile.close();
-
-    return messageString;
+    return len;
 }
+
 
 void AES_encryption() {
     unsigned char key[KEY_LEN];
@@ -472,22 +455,20 @@ void AES_encryption() {
     keyExpansion(key, expandedKeys);
 
     /* we now have the expanded keys for each round */
-
-    unsigned char* message = getMessage(messagePath); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
-    int originalLen = strLen(message);
-    int finalMessageLength = paddedMessageLenght(originalLen); // we need the message length to be divisible by 16;
-
-
-    unsigned char* encryptedMessage = new unsigned char[finalMessageLength];
-    for (int i = 0; i < finalMessageLength; i += 16) { //we're working in chunks of 16 bytes
+    int msglen = -1;
+    unsigned char* message = getMessageAndLength(messagePath, msglen); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
+    
+    unsigned char* encryptedMessage = new unsigned char[msglen];
+    for (int i = 0; i < msglen; i += 16) { //we're working in chunks of 16 bytes
         encrypt(message + i, expandedKeys, encryptedMessage + i);
     }
 
     /* we now have the encrypted message */
-    saveEncryptedMessageToFile(encryptedMessagePath, encryptedMessage);
-    cout << strLen(encryptedMessage) << endl;
+    saveEncryptedMessageToFile(encryptedMessagePath, encryptedMessage, msglen);
+    
     //testing if the output is correct
-    for (int i = 0; i < finalMessageLength; i++) {
+    cout << endl;
+    for (int i = 0; i < msglen; i++) {
         cout << hex << (int)encryptedMessage[i] << " ";
     }
     delete[] message;
@@ -563,11 +544,11 @@ void decrypt(unsigned char* encryptedMessage, unsigned char* expandedKey, unsign
         state[i] = encryptedMessage[i];
     }
 
-    initialRound(state, expandedKey);
+    initialRound(state, expandedKey + EXPANDED_KEY_LEN - KEY_LEN);
 
 
     for (int i = NUMBER_OF_ROUNDS - 2; i >= 0; i--) { // we start from 2 rounds less, because we've already done the initial round
-        round(state, expandedKey + (16 * (i + 1)));
+        inverseRound(state, expandedKey + (16 * (i + 1)));
     }
 
     addRoundKey(state, expandedKey); // Final round
@@ -577,31 +558,72 @@ void decrypt(unsigned char* encryptedMessage, unsigned char* expandedKey, unsign
     }
 }
 
+unsigned char* getEncryptedMessage(const char path[], int& messageLenght) {
+    fstream msgFile;
+    msgFile.open(path, ios::in | ios::binary);
+
+    if (!msgFile.is_open()) {
+        cout << "Error while opening " << path;
+        return new unsigned char[0];
+    }
+    unsigned char* messageString = new unsigned char[MAX_MESSAGE_LENGHT];
+    int i = 0;
+    while (!msgFile.eof()) {
+        messageString[i++] = msgFile.get();
+    }
+
+    messageLenght = i - 1; //this gives us the number of characters, -1 because we don't want to count the EOF char
+    //messageString[messageLenght - 1] = '\0';
+    //messageString[i - 1] = 0;
+
+    msgFile.close();
+
+    return messageString;
+}
+
+void initCharArray(unsigned char* arr, size_t size, char value) {
+    for (int i = 0; i < size; i++) arr[i] = value;
+}
+
 void AES_decryption() {
     unsigned char key[KEY_LEN];
     getKey(key, keyPath);
     unsigned char expandedKey[EXPANDED_KEY_LEN];
     keyExpansion(key, expandedKey);
 
-    unsigned char* encryptedMessage = getEncryptedMessage(encryptedMessagePath);
-    int messageLenght = paddedMessageLenght(strLen(encryptedMessage));
-    cout << endl << messageLenght << endl;
+    int messageLenght = -1;
+    unsigned char* encryptedMessage = getEncryptedMessage(encryptedMessagePath, messageLenght);
+    encryptedMessage[messageLenght] = '\0';
+    cout << "encrtped message: " << encryptedMessage;
+    
+    cout << endl <<  "messge length encrypted file len: " << messageLenght << endl;
+    cout << "\nencyrpted message hex values: ";
+    for (int i = 0; i < messageLenght; i++) {
+        cout << hex << (int)encryptedMessage[i] << " ";
+    }
 
-    unsigned char* decryptedMessage = new unsigned char[messageLenght];
-
+    unsigned char* decryptedMessage = new unsigned char[messageLenght + 1];
+    initCharArray(decryptedMessage, messageLenght + 1, '\0');
+    
     for (int i = 0; i < messageLenght; i += 16) {
         decrypt(encryptedMessage + i, expandedKey, decryptedMessage + i);
     }
-    //cout << "Decrypted message: " << decryptedMessage;
+
+    cout << "\n\n" << decryptedMessage << endl;
+    
+    cout << "\ndecrypted message hex values: ";
     for (int i = 0; i < messageLenght; i++) {
-        cout << decryptedMessage[i] << " ";
+        cout << hex << (int)decryptedMessage[i] << " ";
     }
+
+    delete[] encryptedMessage;
+    delete[] decryptedMessage;
 
 }
 int main()
 {
-    AES_encryption();
-    //AES_decryption();
+    //AES_encryption();
+    AES_decryption();
 
 
 }
