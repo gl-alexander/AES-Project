@@ -256,7 +256,7 @@ unsigned char* getMessageAndLength(const char path[], int& paddedLen) {
     cout << endl << originalLen << endl;
     msgFile.close();
     paddedLen = paddedMessageLenght(originalLen);
-    unsigned char* paddedMessage = padMessage(messageString, originalLen, paddedLen);//rounds the message to 16 bytes if needed
+    unsigned char* paddedMessage = padMessage(messageString, paddedLen, originalLen);//rounds the message to 16 bytes if needed
     return paddedMessage;
 }
 
