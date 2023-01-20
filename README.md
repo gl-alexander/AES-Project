@@ -1,7 +1,7 @@
 # Advanced Encryption Standard Project.
 
 <a href="https://en.wikipedia.org/wiki/Advanced_Encryption_Standard">
-<img alt="Wikipedia Page" src="https://upload.wikimedia.org/wikipedia/en/thumb/8/80/Wikipedia-logo-v2.svg/1200px-Wikipedia-logo-v2.svg.png" width="165"/>
+<img alt="Wikipedia Page" src="https://upload.wikimedia.org/wikipedia/en/thumb/8/80/Wikipedia-logo-v2.svg/1200px-Wikipedia-logo-v2.svg.png" width="80"/>
 </a>
 
 
