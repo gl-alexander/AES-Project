@@ -29,7 +29,7 @@ The decryption process reverses the steps we take in the encryption part.
 Program is configured to store the encrypted message and read the message to decrypt from the same file for convenience. 
 
 <p><strong>Encryption reads from "message.txt" and outputs to "encrypted_message.txt".</strong></p> 
-<p><strong>Decryption reads from _"encrypted_message.txt"_ and outputs to _"decrypted_message.txt"_.</strong></p> 
+<p><strong>Decryption reads from "encrypted_message.txt" and outputs to "decrypted_message.txt".</strong></p> 
 ---
 
 #### Additional Materials used: 
