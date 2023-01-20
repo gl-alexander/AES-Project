@@ -1,3 +1,12 @@
+/**
+*
+* Solution to course project 2
+* Introduction to programming course
+* Faculty of Mathematics and Informatics of Sofia University
+* Winter semester 2022/2023
+*
+*/
+
 #include <iostream>
 #include <fstream>
 using namespace std;
@@ -517,27 +526,6 @@ void decrypt(unsigned char* encryptedMessage, unsigned char* expandedKey, unsign
     }
 }
 
-unsigned char* getEncryptedMessage(const char path[], int& messageLenght) {
-    fstream msgFile;
-    msgFile.open(path, ios::in | ios::binary);
-
-    if (!msgFile.is_open()) {
-        cout << "Error while opening " << path;
-        return new unsigned char[0];
-    }
-    unsigned char* messageString = new unsigned char[MAX_MESSAGE_LENGHT];
-    int i = 0;
-    while (!msgFile.eof()) {
-        messageString[i++] = msgFile.get();
-    }
-
-    messageLenght = i - 1; //this gives us the number of characters, -1 because we don't want to count the EOF char
-    
-    msgFile.close();
-
-    return messageString;
-}
-
 void initCharArray(unsigned char* arr, size_t size, char value) {
     for (int i = 0; i < size; i++) arr[i] = value;
 }
@@ -594,7 +582,7 @@ void AES_decryption() {
     initialKeyExpansion(expandedKeys);
 
     int messageLenght = -1;
-    unsigned char* encryptedMessage = getEncryptedMessage(encryptedMessagePath, messageLenght);
+    unsigned char* encryptedMessage = getMessageAndLength(encryptedMessagePath, messageLenght);
     if (messageLenght == -1) { //we haven't updated the messageLength so we havn't
         cout << "Error while opening " << encryptedMessagePath;
         delete[] encryptedMessage;
@@ -669,7 +657,7 @@ void checkAndCreateFile(const char* path) {
 void neededFiles() {
     cout << "The neeeded files are as follows:" << endl;
     cout << "\t" << messagePath << "\t\t- for storing the message to encrypt" << endl;
-    cout << "\t" << encryptedMessagePath << "\t- for storing the message to decrypt when decrypting and outputs the encrypted message when encrypting" << endl;
+    cout << "\t" << encryptedMessagePath << "\t- for storing the message to decrypt when decrypting and outputs the encrypted message when encrypting, when decrypting the length needs to be divisible by " << endl;
     cout << "\t" << keyPath << "\t\t\t- for storing the encryption key [The key needs to be at least 16 characters long]" << endl;
     checkAndCreateFile(messagePath);
     checkAndCreateFile(encryptedMessagePath);
