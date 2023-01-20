@@ -656,9 +656,9 @@ void checkAndCreateFile(const char* path) {
 
 void neededFiles() {
     cout << "The neeeded files are as follows:" << endl;
-    cout << "\t" << messagePath << "\t\t- for storing the message to encrypt" << endl;
-    cout << "\t" << encryptedMessagePath << "\t- for storing the message to decrypt when decrypting and outputs the encrypted message when encrypting, when decrypting the length needs to be divisible by " << endl;
-    cout << "\t" << keyPath << "\t\t\t- for storing the encryption key [The key needs to be at least 16 characters long]" << endl;
+    cout << "\t" << messagePath << "\t\t- for storing the message to encrypt." << endl;
+    cout << "\t" << encryptedMessagePath << "\t- for storing the message to decrypt when decrypting and outputs the encrypted message when encrypting." << endl;
+    cout << "\t" << keyPath << "\t\t\t- for storing the encryption key [The key needs to be at least 16 characters long]." << endl;
     checkAndCreateFile(messagePath);
     checkAndCreateFile(encryptedMessagePath);
     checkAndCreateFile(keyPath);
