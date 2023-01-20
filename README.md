@@ -17,7 +17,7 @@ The decryption process reverses the steps we take in the encryption part.
 ### Instructions
 
 - Fork / Download the [AES_Project.cpp](AES_Project.cpp) file
-- Ensure that the needed files ("message.txt", "encrypted_message.txt" and "key.txt") are in the same directory as the .cpp file
+- Ensure that the needed files (**"message.txt"**, **"encrypted_message.txt"** and **"key.txt"**) are in the same directory as the .cpp file
 - Enter a key in "key.txt". Key needs to be at least 16 characters long.
 - Enter a message in "message.txt".
 - Enter an encrypted message in "encrypted_message.txt".
@@ -28,8 +28,8 @@ The decryption process reverses the steps we take in the encryption part.
 
 Program is configured to store the encrypted message and read the message to decrypt from the same file for convenience. 
 
-<p> Encryption reads from "message.txt" and outputs to "encrypted_message.txt". </p>
-<p> Decryption reads from "encrypted_message.txt" and outputs to "decrypted_message.txt"</p>
+<p> **Encryption reads from _"message.txt"_ and outputs to _"encrypted_message.txt"_.** </p>
+<p> **Decryption reads from _"encrypted_message.txt"_ and outputs to _"decrypted_message.txt"_.**</p>
 ---
 
 #### Additional Materials used: 
