@@ -6,6 +6,7 @@ const char keyPath[] = "key.txt";
 const char messagePath[] = "message.txt";
 
 const char encryptedMessagePath[] = "encrypted_message.txt";
+const char decryptedMessagePath[] = "decrypted_message.txt";
 
 const int KEY_LEN = 16;
 const int NUMBER_OF_ROUNDS = 10;
@@ -231,7 +232,9 @@ unsigned char* padMessage(const char* message, int paddedLength, int originalLen
 
     for (int i = 0; i < paddedLength; i++) {
         if (i < originalLen) paddedMsg[i] = message[i];
-        else paddedMsg[i] = 0; // if we've gone over the original message, we artificially complete it with zeroes
+        else {
+            paddedMsg[i] = '\0'; // if we've gone over the original message, we artificially complete it with zeroes
+        }
     }
     return paddedMsg;
 }
@@ -245,15 +248,13 @@ unsigned char* getMessageAndLength(const char path[], int& paddedLen) {
         return new unsigned char[0];
     }
     char messageString[MAX_MESSAGE_LENGHT];
-    //msgFile.getline(messageString, MAX_MESSAGE_LENGHT);
 
     int i = 0;
     while (!msgFile.eof()) {
         messageString[i++] = msgFile.get();
     }
     int originalLen = i - 1; //we subtract one since we've incremented it on the EOF character in the while loop
-    messageString[originalLen] = 0;
-    cout << endl << originalLen << endl;
+
     msgFile.close();
     paddedLen = paddedMessageLenght(originalLen);
     unsigned char* paddedMessage = padMessage(messageString, paddedLen, originalLen);//rounds the message to 16 bytes if needed
@@ -326,12 +327,19 @@ void keyExpansion(unsigned char srcKey[KEY_LEN], unsigned char expandedKey[EXPAN
     }
 }
 
+void initialKeyExpansion(unsigned char expandedKey[]) {
+    unsigned char key[KEY_LEN];
+    getKey(key, keyPath);
+    keyExpansion(key, expandedKey);
+}
+
 void addRoundKey(unsigned char* state,const unsigned char* roundKey) {
     for (int i = 0; i < KEY_LEN; i++) {
         state[i] ^= roundKey[i]; //each byte of the message (state) is combined with the key
     }
 }
 
+//lookupTable can either be s_box or inverse_s_box
 void substituteBytes(unsigned char* state, const unsigned char* lookupTable) {
     for (int i = 0; i < KEY_LEN; i++) {
         state[i] = lookupTable[state[i]]; //this is the s-box substitution 
@@ -423,57 +431,8 @@ void encrypt(const unsigned char* message, const unsigned char* expandedKey, uns
 
 }
 
-void saveEncryptedMessageToFile(const char* path, const unsigned char* encryptedMessage, const int msglen) {
-    ofstream writeFile;
-    writeFile.open(path, ios::out | ios::binary | ios::trunc);
-    if (writeFile.is_open()) {
-        for (int i = 0; i < msglen; i++) {
-            writeFile << (char)encryptedMessage[i];
-        }
-        writeFile.close();
-        cout << "Successfully saved encrypted message to file " << path;
-    }
-    else {
-        cout << "Error when opening " << path;
-    }
-    
-}
-int encryptedFileLen(char* encrypted) {
-    int len = 0;
-    while (*encrypted != EOF) {
-        len++;
-        encrypted++;
-    }
-    return len;
-}
 
 
-void AES_encryption() {
-    unsigned char key[KEY_LEN];
-    getKey(key, keyPath); //reads the file containing the key, it must have at least 16 bytes / chars
-    unsigned char expandedKeys[EXPANDED_KEY_LEN];
-    keyExpansion(key, expandedKeys);
-
-    /* we now have the expanded keys for each round */
-    int msglen = -1;
-    unsigned char* message = getMessageAndLength(messagePath, msglen); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
-    
-    unsigned char* encryptedMessage = new unsigned char[msglen];
-    for (int i = 0; i < msglen; i += 16) { //we're working in chunks of 16 bytes
-        encrypt(message + i, expandedKeys, encryptedMessage + i);
-    }
-
-    /* we now have the encrypted message */
-    saveEncryptedMessageToFile(encryptedMessagePath, encryptedMessage, msglen);
-    
-    //testing if the output is correct
-    cout << endl;
-    for (int i = 0; i < msglen; i++) {
-        cout << hex << (int)encryptedMessage[i] << " ";
-    }
-    delete[] message;
-    delete[] encryptedMessage;
-}
 
 // Decryption:
 
@@ -547,12 +506,12 @@ void decrypt(unsigned char* encryptedMessage, unsigned char* expandedKey, unsign
     initialRound(state, expandedKey + EXPANDED_KEY_LEN - KEY_LEN);
 
 
-    for (int i = NUMBER_OF_ROUNDS - 2; i >= 0; i--) { // we start from 2 rounds less, because we've already done the initial round
-        inverseRound(state, expandedKey + (16 * (i + 1)));
+    for (int i = NUMBER_OF_ROUNDS - 1; i >= 1; i--) { // we start from 2 rounds less, because we've already done the initial round
+        inverseRound(state, expandedKey + (16 * i));
     }
 
     addRoundKey(state, expandedKey); // Final round
-
+    
     for (int i = 0; i < 16; i++) {
         decryptedMessage[i] = state[i];
     }
@@ -573,9 +532,7 @@ unsigned char* getEncryptedMessage(const char path[], int& messageLenght) {
     }
 
     messageLenght = i - 1; //this gives us the number of characters, -1 because we don't want to count the EOF char
-    //messageString[messageLenght - 1] = '\0';
-    //messageString[i - 1] = 0;
-
+    
     msgFile.close();
 
     return messageString;
@@ -585,45 +542,177 @@ void initCharArray(unsigned char* arr, size_t size, char value) {
     for (int i = 0; i < size; i++) arr[i] = value;
 }
 
+bool saveMessageToFile(const char* path, const unsigned char* messageToSave, const int msglen) {
+    ofstream writeFile;
+    writeFile.open(path, ios::out | ios::binary | ios::trunc);
+    if (writeFile.is_open()) {
+        for (int i = 0; i < msglen; i++) {
+            writeFile << (char)messageToSave[i];
+        }
+        writeFile.close();
+        return true;
+    }
+    else {
+        return false;
+    }
+
+}
+
+//Final Encryption Logic
+void AES_encryption() {
+    unsigned char expandedKeys[EXPANDED_KEY_LEN];
+    initialKeyExpansion(expandedKeys);
+
+    /* we now have the expanded keys for each round */
+    int msglen = -1;
+    unsigned char* message = getMessageAndLength(messagePath, msglen); //reads the file, containing the message and returns a padded message, divisible into 16 bit chunks
+
+    if (msglen == -1) { //means we've encountered an issue while opening the message
+        cout << "Error while getting message!" << endl;
+        delete[] message;
+        return;
+    }
+
+    unsigned char* encryptedMessage = new unsigned char[msglen];
+    for (int i = 0; i < msglen; i += 16) { //we're working in chunks of 16 bytes
+        encrypt(message + i, expandedKeys, encryptedMessage + i);
+    }
+
+    /* we now have the encrypted message */
+    if (saveMessageToFile(encryptedMessagePath, encryptedMessage, msglen)) {
+        cout << "Successfully saved encrypted message to file: " << encryptedMessagePath << endl;
+    }
+    else cout << "Error while opening: " << encryptedMessagePath << endl;
+
+    delete[] encryptedMessage;
+    delete[] message;
+}
+
+//Final Decryptioni Logic
 void AES_decryption() {
-    unsigned char key[KEY_LEN];
-    getKey(key, keyPath);
-    unsigned char expandedKey[EXPANDED_KEY_LEN];
-    keyExpansion(key, expandedKey);
+    unsigned char expandedKeys[EXPANDED_KEY_LEN];
+    initialKeyExpansion(expandedKeys);
 
     int messageLenght = -1;
     unsigned char* encryptedMessage = getEncryptedMessage(encryptedMessagePath, messageLenght);
-    encryptedMessage[messageLenght] = '\0';
-    cout << "encrtped message: " << encryptedMessage;
-    
-    cout << endl <<  "messge length encrypted file len: " << messageLenght << endl;
-    cout << "\nencyrpted message hex values: ";
-    for (int i = 0; i < messageLenght; i++) {
-        cout << hex << (int)encryptedMessage[i] << " ";
+    if (messageLenght == -1) { //we haven't updated the messageLength so we havn't
+        cout << "Error while opening " << encryptedMessagePath;
+        delete[] encryptedMessage;
+        return;
     }
-
+   
     unsigned char* decryptedMessage = new unsigned char[messageLenght + 1];
     initCharArray(decryptedMessage, messageLenght + 1, '\0');
     
     for (int i = 0; i < messageLenght; i += 16) {
-        decrypt(encryptedMessage + i, expandedKey, decryptedMessage + i);
+        decrypt(encryptedMessage + i, expandedKeys, decryptedMessage + i);
     }
 
-    cout << "\n\n" << decryptedMessage << endl;
+    /* we now have the decrypted message */
+    if (saveMessageToFile(decryptedMessagePath, decryptedMessage, messageLenght)) {
+        cout << "Successfully saved decrypted message to file: " << decryptedMessagePath << endl;
+    }
+    else cout << "Error while opening: " << decryptedMessagePath << endl;
+
+    cout << "\nDecrypted message:\n" << decryptedMessage << endl;
     
-    cout << "\ndecrypted message hex values: ";
-    for (int i = 0; i < messageLenght; i++) {
-        cout << hex << (int)decryptedMessage[i] << " ";
-    }
-
+  
     delete[] encryptedMessage;
     delete[] decryptedMessage;
 
 }
+
+
+
+//Output:
+
+void graphic() {
+    cout << "            ______  _____ " << endl <<
+        "      /\\   | ____|/ ____|" << endl <<
+        "     /  \\  | |__   (___" << endl <<
+        "    / /\\ \\ |  __ |\\___  \\" << endl <<
+        "   / ____ \\| |____ ____) |" << endl <<
+        "  /_/    \\_\\______|_____/" << endl;
+}
+
+void introductionText() {
+    graphic();
+    cout << endl;
+    cout << "AES Encryption / Decryption Tool" << endl;
+    cout << "Introduction to Programming Practicum Course - Winter Semester 2023" << endl;
+    cout << "Author: Alexander Gluskov fn: 9MI0600236" << endl << endl;
+
+}
+
+bool fileExists(const char* path) {
+    ifstream fileToCheck;
+    fileToCheck.open(path);
+    bool exists = fileToCheck.good();
+    fileToCheck.close();
+    return exists;
+}
+
+void createFile(const char* path) {
+    ofstream createFile;
+    createFile.open(path, ios::out);
+    createFile.close();
+
+}
+
+void checkAndCreateFile(const char* path) {
+    if (!fileExists(path)) {
+        createFile(path);
+        cout << "Successfully created " << path << endl;
+    }
+}
+
+void neededFiles() {
+    cout << "The neeeded files are as follows:" << endl;
+    cout << "\t" << messagePath << "\t\t- for storing the message to encrypt" << endl;
+    cout << "\t" << encryptedMessagePath << "\t- for storing the message to decrypt when decrypting and outputs the encrypted message when encrypting" << endl;
+    cout << "\t" << keyPath << "\t\t\t- for storing the encryption key [The key needs to be at least 16 characters long]" << endl;
+    checkAndCreateFile(messagePath);
+    checkAndCreateFile(encryptedMessagePath);
+    checkAndCreateFile(keyPath);
+
+    cout << "All needed files exist!" << endl;
+}
+
+void menu() {
+    cout << endl;
+    cout << "[1] - Encrypt message" << endl;
+    cout << "[2] - Decrypt message" << endl;
+    cout << "[0] - Quit" << endl;
+}
+
+
 int main()
 {
-    //AES_encryption();
-    AES_decryption();
+    //Introduction Text
+    introductionText();
+    neededFiles();
 
+
+    cout << "Choose an operation by entering a single digit (1 / 2 / 0)" << endl;
+    int choice = -1; //we initialize it to an item that's not in the menu
+    
+    while (choice != 0) {
+        menu();
+        cin >> choice;
+        switch (choice) {
+        case 1:
+            AES_encryption();
+            break;
+        case 2:
+            AES_decryption();
+            break;
+        case 0:
+            cout << "Quitting..." << endl;
+            break;
+        default:
+            cout << "Invalid input! Enter a digit between 0 and 2." << endl;
+            break;
+        }
+    }
 
 }
